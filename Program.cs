@@ -58,7 +58,6 @@ app.MapPost("/shorten", async ([FromBody] UrlRequest request, UrlShortenerContex
 
     newURL.ShortCode = Base62.Encode(newURL.Id);
 
-    Console.WriteLine(newURL.ShortCode);
     await context.SaveChangesAsync();
 
     //Crear urlShort y guardarla.
@@ -66,15 +65,16 @@ app.MapPost("/shorten", async ([FromBody] UrlRequest request, UrlShortenerContex
     {
         Id = newURL.Id,
         ShortCode = newURL.ShortCode,
-        Url = newURL.Url
+        Url = newURL.Url,
+
     });
 
 }).WithName("Shorten");
 
 app.MapGet("/shorten/{shortCode}", async (string shortCode, UrlShortenerContext context) =>
 {
-    var existingURL = await context.ShortenedUrls
-        .FirstOrDefaultAsync(u => u.ShortCode == shortCode);
+    var id = Base62.Decode(shortCode);
+    var existingURL = await context.ShortenedUrls.FindAsync(id);
 
     if (existingURL is null)
     {
@@ -84,17 +84,24 @@ app.MapGet("/shorten/{shortCode}", async (string shortCode, UrlShortenerContext 
         });
     }
 
+    var accessCount = existingURL.Clicks ?? 0;
+    existingURL.Clicks = accessCount + 1;
+    await context.SaveChangesAsync();
+
     return Results.Ok(new UrlResponse()
     {
         Id = existingURL.Id,
         ShortCode = existingURL.ShortCode!,
-        Url = existingURL.Url
+        Url = existingURL.Url,
+        CreatedAt = existingURL.CreatedAt,
+        UpdatedAt = existingURL.UpdatedAt
     });
 
 })
 .WithName("GetShorten");
 
-app.MapPut("/shorten/{shortCode}", async (string shortCode, [FromBody] UrlRequest request, UrlShortenerContext context) =>
+app.MapPut("/shorten/{shortCode}", async (string shortCode, [FromBody] UrlRequest request,
+    UrlShortenerContext context) =>
 {
     if (!ValidateURL(request.Url))
     {
@@ -104,8 +111,8 @@ app.MapPut("/shorten/{shortCode}", async (string shortCode, [FromBody] UrlReques
         });
     }
 
-    var existingURL = await context.ShortenedUrls
-        .FirstOrDefaultAsync(u => u.ShortCode == shortCode);
+    var id = Base62.Decode(shortCode);
+    var existingURL = await context.ShortenedUrls.FindAsync(id);
 
     if (existingURL is null)
     {
@@ -116,16 +123,66 @@ app.MapPut("/shorten/{shortCode}", async (string shortCode, [FromBody] UrlReques
     }
 
     existingURL.Url = request.Url;
+    existingURL.UpdatedAt = DateTime.Now;
     await context.SaveChangesAsync();
 
     return Results.Ok(new UrlResponse()
     {
         Id = existingURL.Id,
         ShortCode = existingURL.ShortCode!,
-        Url = existingURL.Url
+        Url = existingURL.Url,
+        CreatedAt = existingURL.CreatedAt,
+        UpdatedAt = existingURL.UpdatedAt
     });
 
 }).WithName("PutShorten");
+
+app.MapDelete("/shorten/{shortCode}", async (string shortCode, UrlShortenerContext context) =>
+{
+    var id = Base62.Decode(shortCode);
+    var existingURL = await context.ShortenedUrls.FindAsync(id);
+
+    if (existingURL is null)
+    {
+        return Results.NotFound(new
+        {
+            message = "La URL a eliminar no existe."
+        });
+    }
+
+    context.ShortenedUrls.Remove(existingURL);
+
+    await context.SaveChangesAsync();
+
+    return Results.NoContent();
+
+}).WithName("DeleteShorten");
+
+app.MapGet("/shorten/{shortCode}/stats", async (string shortCode, UrlShortenerContext context) =>
+{
+    var id = Base62.Decode(shortCode);
+    var existingURL = await context.ShortenedUrls
+        .FindAsync(id);
+
+    if (existingURL is null)
+    {
+        return Results.NotFound(new
+        {
+            message = "La URL a eliminar no existe."
+        });
+    }
+
+    return Results.Ok(new UrlStatsResponse()
+    {
+        Id = existingURL.Id,
+        ShortCode = existingURL.ShortCode!,
+        Url = existingURL.Url,
+        CreatedAt = existingURL.CreatedAt,
+        UpdatedAt = existingURL.UpdatedAt,
+        AccessCount = existingURL.Clicks
+    });
+
+}).WithName("GetShortenStats");
 
 app.Run();
 
@@ -138,11 +195,16 @@ bool ValidateURL(string url)
 
 record UrlRequest(string Url);
 
-record UrlResponse()
+class UrlResponse()
 {
     public long Id { get; set; }
     public string Url { get; set; } = string.Empty;
     public string ShortCode { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
-    public DateTime UpdatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+class UrlStatsResponse : UrlResponse
+{
+    public int? AccessCount { get; set; }
 }

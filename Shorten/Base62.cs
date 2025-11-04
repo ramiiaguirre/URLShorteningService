@@ -16,6 +16,7 @@ public static class Base62
         while (number > 0)
         {
             result.Insert(0, ALPHABET[(int)number % BASE]);
+            
             number /= BASE;
             Console.WriteLine(result.ToString());
         }
