@@ -28,7 +28,7 @@ app.MapPost("/shorten", async ([FromBody] UrlRequest request, UrlShortenerContex
     {
         return Results.BadRequest(new
         {
-            message = "La URL ingresada es inválida"
+            message = "The URL entered is invalid."
         });
     }
 
@@ -39,6 +39,7 @@ app.MapPost("/shorten", async ([FromBody] UrlRequest request, UrlShortenerContex
     {
         return Results.Conflict(new UrlResponse()
         {
+            Id = existingURL.Id,
             Url = existingURL.Url,
             ShortCode = existingURL.ShortCode!,
             CreatedAt = existingURL.CreatedAt,
@@ -46,7 +47,6 @@ app.MapPost("/shorten", async ([FromBody] UrlRequest request, UrlShortenerContex
         });
     }        
 
-    //Create a resourse
     var newURL = new URLShorted()
     {
         Url = request.Url,
@@ -60,13 +60,13 @@ app.MapPost("/shorten", async ([FromBody] UrlRequest request, UrlShortenerContex
 
     await context.SaveChangesAsync();
 
-    //Crear urlShort y guardarla.
     return Results.Created("/shorten", new UrlResponse()
     {
         Id = newURL.Id,
         ShortCode = newURL.ShortCode,
         Url = newURL.Url,
-
+        CreatedAt = newURL.CreatedAt,
+        UpdatedAt = newURL.UpdatedAt
     });
 
 }).WithName("Shorten");
@@ -80,7 +80,7 @@ app.MapGet("/shorten/{shortCode}", async (string shortCode, UrlShortenerContext 
     {
         return Results.NotFound(new
         {
-            message = "El código no redirige a ninguna URL"
+            message = "The alias code doesn't retrieve any URL."
         });
     }
 
@@ -107,7 +107,7 @@ app.MapPut("/shorten/{shortCode}", async (string shortCode, [FromBody] UrlReques
     {
         return Results.BadRequest(new
         {
-            message = "La URL ingresada es inválida"
+            message = "The URL entered is invalid."
         });
     }
 
@@ -118,7 +118,7 @@ app.MapPut("/shorten/{shortCode}", async (string shortCode, [FromBody] UrlReques
     {
         return Results.NotFound(new
         {
-            message = "La URL a editar no existe."
+            message = "The URL for editing doesn't exist."
         });
     }
 
@@ -146,7 +146,7 @@ app.MapDelete("/shorten/{shortCode}", async (string shortCode, UrlShortenerConte
     {
         return Results.NotFound(new
         {
-            message = "La URL a eliminar no existe."
+            message = "The URL for delete doesn't exist."
         });
     }
 
@@ -168,7 +168,7 @@ app.MapGet("/shorten/{shortCode}/stats", async (string shortCode, UrlShortenerCo
     {
         return Results.NotFound(new
         {
-            message = "La URL a eliminar no existe."
+            message = "The URL (for show stats) doesn't exist."
         });
     }
 
